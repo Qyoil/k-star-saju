@@ -8,7 +8,7 @@
 //   4) 상극(相剋): 木→土→水→火→金→木  (내가 누르는지, 상대가 나를 누르는지)
 //   5) 천간충(天干沖): 甲庚 乙辛 丙壬 丁癸 -> 가장 강한 긴장
 //   6) 오행 보완: 두 사람의 오행 밸런스에서 서로의 부족한 기운을 채워 주면 가산점
-//   점수는 "관계 유형 기본점 + 오행 보완 + 음양 대비"로 정해지는 결정적 값입니다 (같은 입력 = 같은 결과).
+//   점수는 "관계 유형 기본점 + 오행 보완 + 주력 오행 관계 + 음양 대비"로 정해지는 결정적 값입니다 (같은 입력 = 같은 결과). 튜닝값: SCORE_TUNING
 //
 // ■ 주의: 재미·자기성찰용 콘텐츠입니다. 실제 인간관계나 아티스트 본인의 성향을 단정하지 않습니다.
 //   생년월일은 공개 프로필 기준, 출생 시각·지지(地支)는 반영하지 않는 간이 계산입니다.
@@ -29,6 +29,7 @@ export interface PersonView {
   stemIndex: number;
   stemChar: string; // 丁
   element: Element;
+  dominant: Element; // 오행 밸런스에서 가장 큰 기운
   yin: boolean;
   nature: string;
   tag: string;
@@ -40,6 +41,7 @@ export interface ReportSection {
   no: string; // "01"
   title: string;
   headline: string;
+  teaser: string; // 잠금 상태에서 보여 주는 궁금증 유발 한 줄 (챕터 1은 빈 문자열)
   paragraphs: string[];
   bullets: string[];
 }
@@ -82,15 +84,20 @@ export function relationOf(a: number, b: number): Relation {
   return "controlled";
 }
 
-const BASE_SCORE: Record<Relation, number> = {
-  union: 94,
-  fed: 90,
-  feeds: 86,
-  sibling: 82,
-  same: 80,
-  controls: 72,
-  controlled: 68,
-  clash: 62,
+/**
+ * 점수 튜닝값 (한 곳에서만 조절). 목표 분포(무작위 유저 × 48명 로스터 기준):
+ *   90% 이상 15~20% · 75~89% 약 50% · 60~74% 약 25% · 50~59% 5~10%
+ * 점수 = 관계 기본점 + 오행 보완(0..fitMax) + 주력 오행 관계(-2..+2) + 음양 대비(+yy)  -> 50..98 로 제한
+ */
+export const SCORE_TUNING = {
+  base: { union: 88, fed: 76, feeds: 72, sibling: 70, same: 66, controls: 63, controlled: 58, clash: 47 } as Record<Relation, number>,
+  fitW: { union: 0.9, fed: 1.25, feeds: 1, sibling: 1, same: 1, controls: 0.8, controlled: 0.8, clash: 0.6 } as Record<Relation, number>, // 관계별 보완 가중치
+  fitMax: 12, //  오행 보완 최대 가산점
+  fitDiv: 11, //  클수록 보완 가산이 인색해짐
+  lackBelow: 18, // 이 % 미만이면 "부족한 오행"
+  yy: 1, //     음양이 다를 때 가산점
+  min: 50,
+  max: 98,
 };
 
 function pctMap(bal: { element: Element; pct: number }[]): Record<Element, number> {
@@ -107,6 +114,7 @@ function viewOf(name: string, birth: BirthInput): PersonView {
     stemIndex: r.dayStem,
     stemChar: STEMS[r.dayStem].char,
     element: r.element,
+    dominant: r.dominant,
     yin: r.yin,
     nature: "",
     tag: "",
@@ -130,16 +138,41 @@ function weakestElement(a: PersonView, b: PersonView): Element {
   return best;
 }
 
-/** 서로의 부족한 기운을 채워 주는 정도 (0..6) */
+/** 서로의 부족한 기운을 채워 주는 정도 (0..fitMax) */
 function complementBonus(a: PersonView, b: PersonView): number {
+  const T = SCORE_TUNING;
   const ma = pctMap(a.balance);
   const mb = pctMap(b.balance);
   let sum = 0;
   for (const e of ELEMENT_ORDER) {
-    if (ma[e] < 12) sum += mb[e];
-    if (mb[e] < 12) sum += ma[e];
+    sum += Math.max(0, T.lackBelow - ma[e]) * mb[e]; // 내가 부족한 오행을 상대가 얼마나 갖고 있나
+    sum += Math.max(0, T.lackBelow - mb[e]) * ma[e];
   }
-  return Math.min(6, Math.round(sum / 12));
+  return Math.min(T.fitMax, Math.round(sum / (T.fitDiv * 10)));
+}
+
+/** 두 사람의 "주력 오행"끼리의 관계: 상생 +2, 같음 +1, 상극 -2 */
+function dominantTerm(a: PersonView, b: PersonView): number {
+  if (generates(a.dominant, b.dominant) || generates(b.dominant, a.dominant)) return 2;
+  if (a.dominant === b.dominant) return 1;
+  if (controlsEl(a.dominant, b.dominant) || controlsEl(b.dominant, a.dominant)) return -2;
+  return 0;
+}
+
+export function computeScore(you: PersonView, bias: PersonView, relation: Relation): number {
+  const T = SCORE_TUNING;
+  const yy = you.stemIndex % 2 !== bias.stemIndex % 2 ? T.yy : 0;
+  const fit = Math.round(complementBonus(you, bias) * T.fitW[relation]);
+  const raw = T.base[relation] + fit + dominantTerm(you, bias) + yy;
+  return Math.max(T.min, Math.min(T.max, raw));
+}
+
+/** 생년월일 두 개만으로 관계 유형과 점수를 계산 (시뮬레이션·테스트용) */
+export function scoreBetween(a: BirthInput, b: BirthInput): { relation: Relation; score: number } {
+  const x = viewOf("", a);
+  const y = viewOf("", b);
+  const relation = relationOf(x.stemIndex, y.stemIndex);
+  return { relation, score: computeScore(x, y, relation) };
 }
 
 /* ------------------------------------------------------------------ */
@@ -458,6 +491,7 @@ const T: Record<
     romanceHead: string;
     shadowHead: string;
     remedyHead: string;
+    teasers: Record<SectionId, string>;
     stemLine: string;
     giveLine: string;
     giveLineYou: string;
@@ -486,6 +520,12 @@ const T: Record<
     romanceHead: "How love moves between {you} and {bias}",
     shadowHead: "Where the friction lives",
     remedyHead: "Feed the {el} to strengthen the bond",
+    teasers: {
+      chemistry: "",
+      romance: "What really pulls you and {bias} together, and the love language each of you speaks without saying a word…",
+      shadow: "The one habit that could quietly create distance between you and {bias}, and how to defuse it before it grows…",
+      remedy: "Your pair's lucky color, direction and numbers, plus a small ritual that makes the bond stronger…",
+    },
     stemLine: "{uStem} ({uTag}) × {bStem} ({bTag})",
     giveLine: "{name} shows love through {style}.",
     giveLineYou: "You show love through {style}.",
@@ -521,6 +561,12 @@ const T: Record<
     romanceHead: "{you}와(과) {bias} 사이에 사랑이 흐르는 방식",
     shadowHead: "마찰이 숨어 있는 곳",
     remedyHead: "{el}의 기운을 채우면 인연이 단단해져요",
+    teasers: {
+      chemistry: "",
+      romance: "당신과 {bias}을(를) 끌어당기는 진짜 이유, 그리고 서로가 말없이 쓰는 사랑의 언어는…",
+      shadow: "{bias}와(과) 당신 사이에 조용히 거리를 만들 수 있는 단 하나의 습관, 그리고 커지기 전에 푸는 법…",
+      remedy: "두 사람만의 행운의 색·방향·숫자, 그리고 인연을 단단하게 하는 작은 의식…",
+    },
     stemLine: "{uStem}({uTag}) × {bStem}({bTag})",
     giveLine: "{name}의 애정 표현: {style}",
     giveLineYou: "{name}의 애정 표현: {style}",
@@ -556,6 +602,12 @@ const T: Record<
     romanceHead: "爱在{you}与{bias}之间如何流动",
     shadowHead: "摩擦藏在哪里",
     remedyHead: "补足{el}之气，让缘分更稳固",
+    teasers: {
+      chemistry: "",
+      romance: "真正把你和{bias}吸引到一起的力量，以及你们各自不言而喻的爱之语言…",
+      shadow: "可能悄悄拉开你与{bias}距离的那一个习惯，以及在它变大之前化解的方法…",
+      remedy: "属于你们的幸运色、方位、数字，以及让缘分更稳固的小仪式…",
+    },
     stemLine: "{uStem}（{uTag}）× {bStem}（{bTag}）",
     giveLine: "{name}表达爱的方式是：{style}。",
     giveLineYou: "{name}表达爱的方式是：{style}。",
@@ -628,8 +680,7 @@ export function buildReport(userBirth: BirthInput, bias: BiasInput, lang: Lang):
   }
 
   const relation = relationOf(you.stemIndex, bs.stemIndex);
-  const ya = you.stemIndex % 2 !== bs.stemIndex % 2 ? 2 : 0; // 음양이 다르면 +2
-  const score = Math.max(55, Math.min(98, BASE_SCORE[relation] + complementBonus(you, bs) + ya));
+  const score = computeScore(you, bs, relation);
   const verdict = t.tiers[tierIndex(score)];
 
   const weak = weakestElement(you, bs);
@@ -665,6 +716,7 @@ export function buildReport(userBirth: BirthInput, bias: BiasInput, lang: Lang):
       no: NUM[0],
       title: t.titles.chemistry,
       headline: F(t.chemHead, v),
+      teaser: "",
       paragraphs: [F(R.chem[lang], v)],
       bullets: [F(t.stemLine, v), R.label[lang]],
     },
@@ -673,6 +725,7 @@ export function buildReport(userBirth: BirthInput, bias: BiasInput, lang: Lang):
       no: NUM[1],
       title: t.titles.romance,
       headline: F(t.romanceHead, v),
+      teaser: F(t.teasers.romance, v),
       paragraphs: [F(R.attract[lang], v)],
       bullets: [
         F(t.giveLineYou, { name: you.name, style: uLove.give[lang] }),
@@ -684,6 +737,7 @@ export function buildReport(userBirth: BirthInput, bias: BiasInput, lang: Lang):
       no: NUM[2],
       title: t.titles.shadow,
       headline: t.shadowHead,
+      teaser: F(t.teasers.shadow, v),
       paragraphs: [F(R.tension[lang], v)],
       bullets: [
         F(t.watchLineYou, { name: you.name, fric: uLove.friction[lang] }),
@@ -695,6 +749,7 @@ export function buildReport(userBirth: BirthInput, bias: BiasInput, lang: Lang):
       no: NUM[3],
       title: t.titles.remedy,
       headline: F(t.remedyHead, v),
+      teaser: F(t.teasers.remedy, v),
       paragraphs: [F(t.remedyIntro, v), F(R.fix[lang], v)],
       bullets: [
         F(t.doB, { v: rem.ritual[lang] }),

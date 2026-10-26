@@ -36,6 +36,11 @@ export interface UiText {
   luckyDir: string;
   luckyNum: string;
   footer: string;
+  lockedTag: string;
+  lockedTitle: string;
+  unlockCta: string; // {idol} {price}
+  testNote: string;
+  unlockedTag: string;
 }
 
 export const UI: Record<Lang, UiText> = {
@@ -72,6 +77,11 @@ export const UI: Record<Lang, UiText> = {
     luckyDir: "Direction",
     luckyNum: "Numbers",
     footer: "K-Star Saju · for entertainment only",
+    lockedTag: "Locked",
+    lockedTitle: "3 chapters are waiting for you",
+    unlockCta: "Unlock Full Secrets with {idol} for {price}",
+    testNote: "Test mode · no payment is taken yet",
+    unlockedTag: "Unlocked",
   },
   ko: {
     pickerKicker: "1:1 심층 궁합",
@@ -106,6 +116,11 @@ export const UI: Record<Lang, UiText> = {
     luckyDir: "방향",
     luckyNum: "숫자",
     footer: "K-Star Saju · 재미로만 즐겨 주세요",
+    lockedTag: "잠김",
+    lockedTitle: "3개의 챕터가 기다리고 있어요",
+    unlockCta: "{idol}와(과)의 비밀 전체 열기 · {price}",
+    testNote: "테스트 모드 · 아직 결제는 진행되지 않아요",
+    unlockedTag: "열림",
   },
   zh: {
     pickerKicker: "1对1深度契合",
@@ -140,6 +155,11 @@ export const UI: Record<Lang, UiText> = {
     luckyDir: "方位",
     luckyNum: "数字",
     footer: "K-Star Saju · 仅供娱乐",
+    lockedTag: "已锁定",
+    lockedTitle: "还有3个章节等你解锁",
+    unlockCta: "解锁与{idol}的全部秘密 · {price}",
+    testNote: "测试模式 · 目前不会扣款",
+    unlockedTag: "已解锁",
   },
 };
 

@@ -3,9 +3,9 @@
 // app/report/ReportView.tsx
 // 1:1 심층 궁합 리포트 뷰어: 다크 럭셔리 매거진 스타일 + 인쇄/PDF 저장 최적화
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { buildReport, type PersonView } from "../../lib/compatibility";
-import { ELEMENT_EMOJI, ELEMENT_NAME } from "../../lib/i18n";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildReport, josa, type PersonView, type ReportSection } from "../../lib/compatibility";
+import { ELEMENT_EMOJI, ELEMENT_NAME, fill } from "../../lib/i18n";
 import { ELEMENT_ORDER, formatBirth, type BirthInput, type Element, type Lang } from "../../lib/saju";
 import { reportBase, resultBackHref, UI } from "./ui";
 
@@ -22,6 +22,90 @@ const EL_COLOR: Record<Element, string> = {
   metal: "#94a3b8",
   water: "#60a5fa",
 };
+
+/** 테스트용 가격 표기. 실제 결제(Lemon Squeezy) 연결 시 이 값과 아래 unlock() 을 교체하세요. */
+const PRICE = "$3.99";
+
+/* 잠금 상태에서는 진짜 본문 대신 "같은 길이의 의미 없는 문장"을 그려 블러 처리합니다.
+   -> 잠금 중에는 실제 풀이 문장이 화면(HTML)에 존재하지 않습니다. */
+const FILLER: Record<Lang, string[]> = {
+  en: ["hidden", "dynamic", "between", "your", "souls", "secret", "pattern", "quietly", "unfolds", "energy", "shared", "moment"],
+  ko: ["숨겨진", "두", "사람의", "비밀", "이야기가", "조용히", "펼쳐지는", "에너지와", "흐름이", "함께", "나눈", "순간"],
+  zh: ["隐藏的", "秘密", "正在", "两人", "之间", "悄悄", "流动", "能量", "与", "默契", "共享", "时刻"],
+};
+function filler(len: number, lang: Lang, seed: number): string {
+  const words = FILLER[lang];
+  const sep = lang === "zh" ? "" : " ";
+  let out = "";
+  let i = seed;
+  while (out.length < len) {
+    out += (out ? sep : "") + words[i % words.length];
+    i += 5;
+  }
+  return out.slice(0, Math.max(8, len));
+}
+
+function ChapterHead({ s, locked, lockedTag }: { s: ReportSection; locked: boolean; lockedTag: string }) {
+  return (
+    <div className="flex items-baseline gap-4 border-b border-[var(--rp-rule)] pb-3">
+      <span className="rp-serif text-5xl font-semibold leading-none text-[var(--rp-accent)]" aria-hidden="true">
+        {s.no}
+      </span>
+      <h2 id={`ch-${s.id}`} className="rp-serif m-0 flex-1 text-[clamp(22px,5.4vw,30px)] font-semibold leading-tight">
+        {s.title}
+      </h2>
+      {locked && (
+        <span className="rp-noprint shrink-0 rounded-full border border-fuchsia-300/40 bg-fuchsia-500/15 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-100">
+          🔒 {lockedTag}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ChapterBody({
+  s,
+  remedy,
+  labels,
+}: {
+  s: ReportSection;
+  remedy: { color: string; direction: string; numbers: string };
+  labels: { color: string; dir: string; num: string };
+}) {
+  return (
+    <>
+      {s.paragraphs.map((p, i) => (
+        <p key={i} className="m-0 text-[15px] leading-[1.85] text-[var(--rp-fg)]/90">
+          {p}
+        </p>
+      ))}
+      {s.id === "remedy" && (
+        <div className="grid grid-cols-3 gap-2 text-center" aria-label="lucky">
+          {[
+            [labels.color, remedy.color],
+            [labels.dir, remedy.direction],
+            [labels.num, remedy.numbers],
+          ].map(([k, v]) => (
+            <div key={k} className="rp-card rounded-xl border border-[var(--rp-line)] bg-[var(--rp-card)] px-2 py-3">
+              <p className="m-0 text-[10px] uppercase tracking-[.18em] text-[var(--rp-accent)]">{k}</p>
+              <p className="m-0 mt-1 text-[13px] font-medium leading-snug">{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {s.bullets.map((b, i) => (
+          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[var(--rp-fg)]/85">
+            <span className="mt-0.5 shrink-0 text-[var(--rp-accent)]" aria-hidden="true">
+              ✦
+            </span>
+            <span className="min-w-0 break-words">{b}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 function ScoreRing({ score, label }: { score: number; label: string }) {
   const r = 70;
@@ -109,9 +193,27 @@ export default function ReportView({
   initialLang: Lang;
 }) {
   const [lang, setLang] = useState<Lang>(initialLang);
+  // 테스트용 잠금: locked -> revealing(블러 상태로 진짜 본문 그림) -> open(블러가 풀림)
+  const [phase, setPhase] = useState<"locked" | "revealing" | "open">("locked");
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (timer.current) window.clearTimeout(timer.current);
+  }, []);
   const t = UI[lang];
   const biasName = lang === "ko" ? bias.nameKo : bias.nameEn;
   const report = useMemo(() => buildReport(user, { name: biasName, birth: bias.birth }, lang), [user, bias.birth, biasName, lang]);
+
+  /**
+   * TODO(결제 연동): 지금은 테스트용으로 클릭하면 바로 열립니다.
+   * 실제 결제 후에는 이 함수 대신 Lemon Squeezy 체크아웃으로 보내고,
+   * 결제 확인(웹훅)이 끝난 사람에게만 서버에서 본문을 내려 주세요.
+   */
+  function unlock() {
+    if (phase !== "locked") return;
+    setPhase("revealing");
+    timer.current = window.setTimeout(() => setPhase("open"), 60);
+  }
+  const unlocked = phase !== "locked";
 
   function chooseLang(next: Lang) {
     setLang(next);
@@ -205,49 +307,83 @@ export default function ReportView({
           <PersonCard p={report.bias} lang={lang} role="BIAS" />
         </section>
 
-        {/* 4대 챕터 */}
-        {report.sections.map((s) => (
+        {/* 챕터 1: 항상 공개 */}
+        {report.sections.slice(0, 1).map((s) => (
           <section key={s.id} className="rp-chapter flex flex-col gap-4" aria-labelledby={`ch-${s.id}`}>
-            <div className="flex items-baseline gap-4 border-b border-[var(--rp-rule)] pb-3">
-              <span className="rp-serif text-5xl font-semibold leading-none text-[var(--rp-accent)]" aria-hidden="true">
-                {s.no}
-              </span>
-              <h2 id={`ch-${s.id}`} className="rp-serif m-0 text-[clamp(22px,5.4vw,30px)] font-semibold leading-tight">
-                {s.title}
-              </h2>
-            </div>
+            <ChapterHead s={s} locked={false} lockedTag={t.lockedTag} />
             <p className="rp-serif m-0 text-balance text-xl italic leading-snug text-[var(--rp-fg)]">{s.headline}</p>
-            {s.paragraphs.map((p, i) => (
-              <p key={i} className="m-0 text-[15px] leading-[1.85] text-[var(--rp-fg)]/90">
-                {p}
-              </p>
-            ))}
-            {s.id === "remedy" && (
-              <div className="grid grid-cols-3 gap-2 text-center" aria-label="lucky">
-                {[
-                  [t.luckyColor, report.remedy.color],
-                  [t.luckyDir, report.remedy.direction],
-                  [t.luckyNum, report.remedy.numbers],
-                ].map(([k, v]) => (
-                  <div key={k} className="rp-card rounded-xl border border-[var(--rp-line)] bg-[var(--rp-card)] px-2 py-3">
-                    <p className="m-0 text-[10px] uppercase tracking-[.18em] text-[var(--rp-accent)]">{k}</p>
-                    <p className="m-0 mt-1 text-[13px] font-medium leading-snug">{v}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {s.bullets.map((b, i) => (
-                <li key={i} className="flex gap-3 text-sm leading-relaxed text-[var(--rp-fg)]/85">
-                  <span className="mt-0.5 shrink-0 text-[var(--rp-accent)]" aria-hidden="true">
-                    ✦
-                  </span>
-                  <span className="min-w-0 break-words">{b}</span>
-                </li>
-              ))}
-            </ul>
+            <ChapterBody
+              s={s}
+              remedy={report.remedy}
+              labels={{ color: t.luckyColor, dir: t.luckyDir, num: t.luckyNum }}
+            />
           </section>
         ))}
+
+        {/* 챕터 2~4: 티징(제목·소제목만 공개) -> 결제 후 전체 공개 */}
+        <div className="relative flex flex-col gap-10">
+          {report.sections.slice(1).map((s) => (
+            <section key={s.id} className="rp-chapter flex flex-col gap-4" aria-labelledby={`ch-${s.id}`}>
+              <ChapterHead s={s} locked={!unlocked} lockedTag={t.lockedTag} />
+              <p className="rp-serif m-0 text-balance text-xl italic leading-snug text-[var(--rp-fg)]">{s.headline}</p>
+              {!unlocked && s.teaser && <p className="m-0 text-sm leading-relaxed text-[var(--rp-dim)]">{s.teaser}</p>}
+              {phase === "locked" ? (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none flex select-none flex-col gap-4 opacity-80 blur-[9px]"
+                >
+                  {s.paragraphs.map((p, i) => (
+                    <p key={i} className="m-0 text-[15px] leading-[1.85]">
+                      {filler(p.length, lang, i * 3 + s.no.charCodeAt(1))}
+                    </p>
+                  ))}
+                  <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                    {s.bullets.map((b, i) => (
+                      <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                        <span aria-hidden="true">✦</span>
+                        <span>{filler(b.length, lang, i * 2 + 1)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div
+                  className={`flex flex-col gap-4 transition-[filter,opacity] duration-[900ms] ease-out ${
+                    phase === "revealing" ? "opacity-80 blur-[9px]" : "opacity-100 blur-0"
+                  }`}
+                >
+                  <ChapterBody
+                    s={s}
+                    remedy={report.remedy}
+                    labels={{ color: t.luckyColor, dir: t.luckyDir, num: t.luckyNum }}
+                  />
+                </div>
+              )}
+            </section>
+          ))}
+
+          {/* 결제 유도 CTA: 블러 중앙에 떠 있다가 스크롤을 따라옴 (잠금 중에만) */}
+          {phase === "locked" && (
+            <div className="rp-noprint pointer-events-none absolute inset-0 z-20">
+              <div className="pointer-events-none sticky top-[24vh] flex justify-center px-1 pt-44">
+                <div className="pointer-events-auto flex w-full max-w-[340px] flex-col items-center gap-3 rounded-3xl border border-fuchsia-300/40 bg-[rgba(18,8,44,.72)] p-5 text-center shadow-[0_0_60px_rgba(217,70,239,.45),inset_0_1px_0_rgba(255,255,255,.18)] backdrop-blur-xl">
+                  <span className="text-3xl" aria-hidden="true">
+                    🔒
+                  </span>
+                  <p className="rp-serif m-0 text-lg font-semibold leading-snug text-white">{t.lockedTitle}</p>
+                  <button
+                    type="button"
+                    onClick={unlock}
+                    className="min-h-14 w-full cursor-pointer rounded-2xl border border-white/25 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-4 py-3 text-[15px] font-bold leading-snug text-white shadow-[0_0_30px_rgba(217,70,239,.55)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(236,72,153,.8)] active:translate-y-0 active:scale-[.97]"
+                  >
+                    {josa(fill(t.unlockCta, { idol: report.bias.name, price: PRICE }))}
+                  </button>
+                  <p className="m-0 text-[11px] text-violet-200/60">{t.testNote}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <footer className="flex flex-col gap-3 border-t border-[var(--rp-rule)] pt-5">
           <p className="m-0 text-xs leading-relaxed text-[var(--rp-dim)]">{report.disclaimer}</p>
@@ -256,6 +392,7 @@ export default function ReportView({
 
         {/* 하단 버튼 (인쇄 시 숨김) */}
         <div className="rp-noprint flex flex-wrap gap-3">
+          {unlocked && (
           <button
             type="button"
             onClick={() => window.print()}
@@ -263,6 +400,7 @@ export default function ReportView({
           >
             🖨 {t.print}
           </button>
+          )}
           <Link
             href={reportBase(user, lang)}
             className="flex min-h-12 flex-[1_1_200px] items-center justify-center rounded-2xl border border-[var(--rp-line)] bg-white/[0.06] px-5 text-[15px] font-semibold text-[var(--rp-fg)] transition hover:-translate-y-0.5 hover:bg-white/10 active:scale-[.97]"
