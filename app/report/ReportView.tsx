@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { buildReport, josa, type PersonView, type ReportSection } from "../../lib/compatibility";
 import { ELEMENT_EMOJI, ELEMENT_NAME, fill } from "../../lib/i18n";
 import { ELEMENT_ORDER, formatBirth, type BirthInput, type Element, type Lang } from "../../lib/saju";
+import { CHECKOUT_URL, LIST_PRICE, OFF_PCT, PRICE, usd } from "../../lib/checkout";
 import { reportBase, resultBackHref, UI } from "./ui";
 
 const LANG_TABS: { value: Lang; label: string }[] = [
@@ -27,13 +28,6 @@ const EL_COLOR: Record<Element, string> = {
    - 결제 링크: 환경변수 NEXT_PUBLIC_LEMONSQUEEZY_REPORT_URL 이 있으면 그 값, 없으면 아래 기본 링크
    - 가격/정가: 아래 숫자만 바꾸면 버튼 문구와 할인율(%)이 자동으로 다시 계산됩니다.
      (Lemon Squeezy 상품 가격도 같은 값으로 맞춰 두세요) */
-const CHECKOUT_URL =
-  process.env.NEXT_PUBLIC_LEMONSQUEEZY_REPORT_URL ||
-  "https://k-star-saju.lemonsqueezy.com/checkout/buy/9351c991-d085-4ebe-a0f8-984e30dac440";
-const PRICE = 3.99;
-const LIST_PRICE = 6.99;
-const OFF_PCT = Math.round((1 - PRICE / LIST_PRICE) * 100); // 3.99 vs 6.99 -> 43
-const usd = (n: number) => `$${n.toFixed(2)}`;
 
 /** 결제 상태 저장(이 브라우저, 리포트별): pending = 결제창을 열었음 / paid = 열람 확인함 */
 const storeKey = (user: BirthInput, bias: { nameEn: string; birth: BirthInput }) =>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
+import { CHECKOUT_URL } from "../../lib/checkout";
 import { parsePref } from "../../lib/pref";
 import { langFromHeader, parseLang, resultFromParams } from "../../lib/saju";
 import ResultView from "./ResultView";
@@ -22,7 +23,7 @@ export default async function ResultPage({ searchParams }: { searchParams: Searc
       result={resultFromParams(params)}
       initialLang={lang}
       pref={parsePref(typeof params.pref === "string" ? params.pref : undefined)}
-      checkoutUrl={process.env.NEXT_PUBLIC_LEMONSQUEEZY_CHECKOUT_URL ?? null}
+      checkoutUrl={CHECKOUT_URL}
     />
   );
 }

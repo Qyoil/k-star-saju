@@ -15,6 +15,7 @@ import {
   heroTitle,
   shortTitle,
 } from "../../lib/i18n";
+import { CHECKOUT_URL, LIST_PRICE, OFF_PCT, usd } from "../../lib/checkout";
 import { idolName, idolTag, seedFromBirth, type Pref } from "../../lib/pref";
 import {
   ELEMENT_CHAR,
@@ -310,7 +311,6 @@ export default function ResultView({
   const [copied, setCopied] = useState(false);
   const [manualText, setManualText] = useState<string | null>(null); // 클립보드가 막혔을 때 직접 복사할 문구
   const [status, setStatus] = useState("");
-  const [payNote, setPayNote] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captionRef = useRef<HTMLTextAreaElement>(null);
@@ -895,30 +895,18 @@ export default function ResultView({
                 <strong className="ff-display text-[34px] font-extrabold tabular-nums">$3.99</strong>
                 <span className="text-xs font-medium opacity-80">{t.oneTime}</span>
               </div>
-              {buyHref ? (
-                <a
-                  href={buyHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${BTN} min-w-[180px] flex-[1_1_180px] bg-[#1d0f46] text-white`}
-                >
-                  {t.payCta}
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setPayNote(true)}
-                  className={`${BTN} min-w-[180px] flex-[1_1_180px] cursor-pointer bg-[#1d0f46] text-white`}
-                >
-                  {t.payCta}
-                </button>
-              )}
+              <a
+                href={buyHref ?? CHECKOUT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${BTN} min-w-[180px] flex-[1_1_180px] bg-[#1d0f46] text-white`}
+              >
+                {t.payCta}
+              </a>
             </div>
-            {payNote && !buyHref && (
-              <p role="status" className="m-0 rounded-[10px] bg-[rgba(42,17,0,.12)] px-3 py-2.5 text-[13px] font-medium">
-                {t.payNotReady}
-              </p>
-            )}
+            <p className="m-0 text-center text-xs font-bold">
+              Special Launch {OFF_PCT}% OFF (<s className="opacity-70">{usd(LIST_PRICE)}</s>)
+            </p>
           </section>
 
           {/* 6. 최애 1:1 심층 리포트 */}
