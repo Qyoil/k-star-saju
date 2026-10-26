@@ -298,12 +298,10 @@ export default function ResultView({
   result,
   initialLang,
   pref,
-  checkoutUrl,
 }: {
   result: SajuResult;
   initialLang: Lang;
   pref: Pref;
-  checkoutUrl: string | null;
 }) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const [modalOpen, setModalOpen] = useState(false);
@@ -510,16 +508,11 @@ export default function ResultView({
 
   /* 결제 링크: Lemon Squeezy 체크아웃 + 커스텀 데이터(웹훅에서 meta.custom_data 로 돌아옴) */
   const buyHref = useMemo(() => {
-    if (!checkoutUrl) return null;
-    try {
-      const u = new URL(checkoutUrl);
-      if (!result.isSample) u.searchParams.set("checkout[custom][birth]", formatBirth(result.birth));
-      u.searchParams.set("checkout[custom][lang]", lang);
-      return u.toString();
-    } catch {
-      return null;
-    }
-  }, [checkoutUrl, result, lang]);
+    const u = new URL(CHECKOUT_URL);
+    if (!result.isSample) u.searchParams.set("checkout[custom][birth]", formatBirth(result.birth));
+    u.searchParams.set("checkout[custom][lang]", lang);
+    return u.toString();
+  }, [result, lang]);
 
   const lockedVars = { a: shortTitle(result.dayStem, lang), b: shortTitle(result.partnerStem, lang) };
   const sub = [
@@ -896,7 +889,7 @@ export default function ResultView({
                 <span className="text-xs font-medium opacity-80">{t.oneTime}</span>
               </div>
               <a
-                href={buyHref ?? CHECKOUT_URL}
+                href={buyHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`${BTN} min-w-[180px] flex-[1_1_180px] bg-[#1d0f46] text-white`}

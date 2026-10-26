@@ -236,16 +236,12 @@ export default function ReportView({
 
   /** 결제 링크(새 탭) + 결제 웹훅에서 쓸 수 있게 생년월일/최애/언어를 custom data 로 전달 */
   const checkoutHref = useMemo(() => {
-    try {
-      const u = new URL(CHECKOUT_URL);
-      u.searchParams.set("checkout[custom][birth]", formatBirth(user));
-      u.searchParams.set("checkout[custom][bias]", bias.nameEn);
-      u.searchParams.set("checkout[custom][bias_birth]", formatBirth(bias.birth));
-      u.searchParams.set("checkout[custom][lang]", lang);
-      return u.toString();
-    } catch {
-      return CHECKOUT_URL;
-    }
+    const u = new URL(CHECKOUT_URL);
+    u.searchParams.set("checkout[custom][birth]", formatBirth(user));
+    u.searchParams.set("checkout[custom][bias]", bias.nameEn);
+    u.searchParams.set("checkout[custom][bias_birth]", formatBirth(bias.birth));
+    u.searchParams.set("checkout[custom][lang]", lang);
+    return u.toString();
   }, [user, bias.nameEn, bias.birth, lang]);
 
   /** 결제 링크 클릭: 새 탭은 <a target="_blank"> 가 열고, 여기서는 "결제창 열었음"만 기록 */

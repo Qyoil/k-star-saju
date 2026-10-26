@@ -58,7 +58,6 @@ const en = {
   lockedLabel: 'Unlocks after purchase',
   oneTime: 'One-time payment',
   payCta: 'Unlock for $3.99',
-  payNotReady: 'Checkout is not connected yet. Add NEXT_PUBLIC_LEMONSQUEEZY_CHECKOUT_URL to .env.local.',
   footer: "For entertainment only. Emblems are original artwork and use no one's likeness. Not affiliated with any artist or agency.",
   simplified: 'Year and month pillars use a simplified calendar. Birth time is not used yet.',
 } as const;
@@ -113,7 +112,6 @@ const ko: Record<UIKey, string> = {
   lockedLabel: '구매 후 열람 가능',
   oneTime: '1회 결제',
   payCta: '$3.99로 열람하기',
-  payNotReady: '결제가 아직 연결되지 않았어요. .env.local에 NEXT_PUBLIC_LEMONSQUEEZY_CHECKOUT_URL을 추가하세요.',
   footer: '재미로 보는 콘텐츠예요. 엠블럼은 자체 제작 그래픽이며 실존 인물의 초상을 사용하지 않아요. 어떤 아티스트·소속사와도 관계가 없어요.',
   simplified: '연주·월주는 간이 절기 기준으로 계산하며, 태어난 시각은 아직 반영하지 않아요.',
 };
@@ -167,7 +165,6 @@ const zh: Record<UIKey, string> = {
   lockedLabel: '购买后解锁',
   oneTime: '一次性付款',
   payCta: '$3.99 立即解锁',
-  payNotReady: '支付尚未接入。请在 .env.local 中添加 NEXT_PUBLIC_LEMONSQUEEZY_CHECKOUT_URL。',
   footer: '仅供娱乐。徽章为原创图形,未使用任何人的肖像。与任何艺人或经纪公司无关。',
   simplified: '年柱与月柱采用简化节气计算,暂未使用出生时辰。',
 };
