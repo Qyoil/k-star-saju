@@ -15,7 +15,7 @@ import {
   heroTitle,
   shortTitle,
 } from "../../lib/i18n";
-import { idolName, idolTag, type Pref } from "../../lib/pref";
+import { idolName, idolTag, seedFromBirth, type Pref } from "../../lib/pref";
 import {
   ELEMENT_CHAR,
   STEM_ELEMENT,
@@ -320,7 +320,8 @@ export default function ResultView({
   const stem = STEMS[result.dayStem];
   const partnerEl = STEM_ELEMENT[result.partnerStem];
   const partnerYin = result.partnerStem % 2 === 1;
-  const idol = idolName(result.partnerStem, pref, lang);
+  const seed = seedFromBirth(result.birth.year, result.birth.month, result.birth.day); // 같은 생일 = 같은 아이돌
+  const idol = idolName(result.partnerStem, pref, lang, seed);
   const title = heroTitle(result.dayStem, lang);
   const mine = PALETTE[result.element];
   const mate = PALETTE[partnerEl];
@@ -349,7 +350,7 @@ export default function ResultView({
       title: heroTitle(result.dayStem, lang),
       nature: STEMS[result.dayStem].nature[lang],
       eyebrow: UI[lang].matchEyebrow,
-      idol: idolName(result.partnerStem, pref, lang),
+      idol: idolName(result.partnerStem, pref, lang, seed),
       score: result.score,
       label: UI[lang].matchLabel,
       userEl: result.element,
@@ -357,7 +358,7 @@ export default function ResultView({
       idolEl: STEM_ELEMENT[result.partnerStem],
       idolYin: result.partnerStem % 2 === 1,
     }),
-    [result, lang, pref],
+    [result, lang, pref, seed],
   );
 
   useEffect(() => {
@@ -473,7 +474,7 @@ export default function ResultView({
       idol: idol.replace(/\s*\(.*?\)\s*/g, " ").trim(), // 괄호 설명은 빼고 짧게: "BTS V (Taehyung)" -> "BTS V"
       score: result.score,
       url: siteUrl(),
-      tag: idolTag(result.partnerStem, pref),
+      tag: idolTag(result.partnerStem, pref, seed),
     });
     window.open(`https://x.com/intent/post?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
