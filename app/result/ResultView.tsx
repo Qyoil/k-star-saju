@@ -257,6 +257,12 @@ const RETRY: Record<Lang, string> = {
   zh: "换个生日再测一次",
 };
 
+const BIAS_CTA: Record<Lang, string> = {
+  en: "Choose my Bias · Open 1:1 report",
+  ko: "내 최애 고르고 1:1 리포트 열기",
+  zh: "选择本命 · 打开1对1报告",
+};
+
 /* 공유 버튼 아이콘 (인라인 SVG, currentColor 로 버튼 글자색을 따라감) */
 function IconInstagram() {
   return (
@@ -915,7 +921,16 @@ export default function ResultView({
             )}
           </section>
 
-          {/* 6. 다시 하기 */}
+          {/* 6. 최애 1:1 심층 리포트 */}
+          <Link
+            href={`/report?y=${result.birth.year}&m=${result.birth.month}&d=${result.birth.day}&lang=${lang}`}
+            className={`${BTN} w-full border-[var(--line)] bg-[rgba(26,16,64,.7)] text-[var(--fg)]`}
+          >
+            <span aria-hidden="true">✦</span>
+            {BIAS_CTA[lang]}
+          </Link>
+
+          {/* 7. 다시 하기 */}
           <Link
             href="/"
             className={`${BTN} w-full border-[var(--line)] bg-[rgba(26,16,64,.7)] text-[var(--fg)]`}

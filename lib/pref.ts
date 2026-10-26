@@ -32,6 +32,7 @@ export interface Idol {
   nameKo: string; //      'BTS 뷔'
   group: string; //       'BTS'
   gender: Gender;
+  born: string; //       공개 프로필 생년월일 'YYYY-MM-DD' (심층 궁합 계산용)
   stem: StemHan; //       일간(천간 한자)
   stemIndex: number; //   0..9 (甲=0 ... 癸=9)
   element: ElementName; // 일간의 오행
@@ -142,6 +143,7 @@ function build(row: Row): Idol {
     nameKo: `${gKo} ${memberKo}`,
     group: gEn,
     gender,
+    born,
     stem: STEM_HAN[stemIndex],
     stemIndex,
     element: ELEMENT_BY_STEM[stemIndex],
@@ -151,6 +153,11 @@ function build(row: Row): Idol {
 
 /** 전체 풀 (보이 + 걸) */
 export const IDOLS: Idol[] = ROSTER.map(build);
+
+/** id 로 아이돌 찾기 (심층 리포트에서 사용). 없으면 undefined */
+export function findIdol(id: string | null | undefined): Idol | undefined {
+  return id ? IDOLS.find((i) => i.id === id) : undefined;
+}
 
 function norm(stem: number): number {
   return ((Math.trunc(stem) % 10) + 10) % 10;
