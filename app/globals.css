@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/* K-Star Saju: 다크 보랏빛 우주 톤 */
+:root {
+  --bg: #0c0722;
+  --panel: #1a1040;
+  --line: rgba(170, 150, 255, 0.24);
+  --fg: #f3eeff;
+  --dim: #b9acea;
+  --faint: #9486cf;
+  --flame: #ff9a4d;
+  --flame-hot: #ffd27a;
+  --moon: #bfd8ff;
+  --pink: #ff72d0;
+  --f-display: "Unbounded", "Noto Sans KR", "Noto Sans SC", "Apple SD Gothic Neo", "PingFang SC", "Malgun Gothic", sans-serif;
+  --f-body: "Noto Sans KR", "Noto Sans SC", "Apple SD Gothic Neo", "PingFang SC", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "Space Mono", ui-monospace, Menlo, monospace;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--moon);
+  outline-offset: 3px;
+}
+
+.ff-display { font-family: var(--f-display); }
+.ff-mono { font-family: var(--f-mono); }
+
+/* 별이 반짝이는 배경 */
+.sky {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(70% 45% at 50% -5%, rgba(124, 77, 255, 0.32), transparent 70%),
+    radial-gradient(50% 35% at 100% 60%, rgba(255, 114, 208, 0.08), transparent 70%);
+}
+.sky::before,
+.sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+}
+.sky::before {
+  background-image:
+    radial-gradient(1px 1px at 24px 40px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 120px 90px, #cfe0ff, transparent),
+    radial-gradient(1px 1px at 210px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 280px 150px, #ffd8f6, transparent),
+    radial-gradient(1px 1px at 70px 210px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 180px 260px, #fff, transparent),
+    radial-gradient(1px 1px at 300px 290px, #cfe0ff, transparent);
+  background-size: 320px 320px;
+  opacity: 0.6;
+}
+.sky::after {
+  background-image:
+    radial-gradient(1.5px 1.5px at 60px 70px, #fff, transparent),
+    radial-gradient(1px 1px at 250px 120px, #ffe9c9, transparent),
+    radial-gradient(1.5px 1.5px at 150px 300px, #fff, transparent),
+    radial-gradient(1px 1px at 380px 220px, #cfe0ff, transparent),
+    radial-gradient(1px 1px at 420px 40px, #fff, transparent);
+  background-size: 470px 470px;
+  opacity: 0.5;
+  animation: kss-twinkle 5s ease-in-out infinite;
+}
+
+/* 엠블럼 */
+.emblem svg { display: block; width: 100%; height: 100%; }
+.emb-orbit { transform-box: fill-box; transform-origin: center; animation: kss-spin 90s linear infinite; }
+.emb-fg { transform-box: fill-box; transform-origin: center bottom; animation: kss-bob 4.5s ease-in-out infinite; }
+.emb-fg-fire { animation: kss-flicker 2.8s ease-in-out infinite; }
+
+/* 오행 막대 / 궁합 링 */
+.bar-fill { transform-origin: left; animation: kss-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ring-fg { stroke-dasharray: 402.12; animation: kss-draw 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes kss-twinkle { 50% { opacity: 0.15; } }
+@keyframes kss-spin { to { transform: rotate(360deg); } }
+@keyframes kss-bob { 50% { transform: translateY(-3px); } }
+@keyframes kss-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  40% { transform: scale(0.96, 1.04); }
+  70% { transform: scale(1.02, 0.98); }
+}
+@keyframes kss-grow { from { transform: scaleX(0); } }
+@keyframes kss-draw { from { stroke-dashoffset: 402.12; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sky::after, .emb-orbit, .emb-fg, .emb-fg-fire, .bar-fill, .ring-fg { animation: none; }
+}
