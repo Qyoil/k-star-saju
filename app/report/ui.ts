@@ -45,6 +45,7 @@ export interface UiText {
   awaitBody: string;
   awaitDone: string;
   awaitReopen: string;
+  celebrate: string;
   unlockedTag: string;
 }
 
@@ -91,6 +92,7 @@ export const UI: Record<Lang, UiText> = {
     awaitBody: "Finished paying? Tap below to open your full report.",
     awaitDone: "I've paid · Open my report",
     awaitReopen: "Reopen checkout",
+    celebrate: "🎉 Unlocked! Your full report is open.",
     unlockedTag: "Unlocked",
   },
   ko: {
@@ -135,6 +137,7 @@ export const UI: Record<Lang, UiText> = {
     awaitBody: "결제를 마치셨나요? 아래 버튼을 눌러 전체 리포트를 여세요.",
     awaitDone: "결제했어요 · 리포트 열기",
     awaitReopen: "결제창 다시 열기",
+    celebrate: "🎉 잠금 해제 완료! 전체 리포트가 열렸어요.",
     unlockedTag: "열림",
   },
   zh: {
@@ -179,6 +182,7 @@ export const UI: Record<Lang, UiText> = {
     awaitBody: "已完成支付？点击下方按钮打开完整报告。",
     awaitDone: "我已支付 · 打开报告",
     awaitReopen: "重新打开支付页",
+    celebrate: "🎉 已解锁！完整报告已开启。",
     unlockedTag: "已解锁",
   },
 };

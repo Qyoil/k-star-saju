@@ -23,6 +23,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export default async function ReportPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const user = resultFromParams(params).birth;
+  const paid = one(params.paid) === "true"; // 결제 후 돌아오는 주소: /report?...&paid=true
   const saved = parseLang((await cookies()).get("kss-lang")?.value);
   const lang = parseLang(params.lang) ?? saved ?? langFromHeader((await headers()).get("accept-language"));
 
@@ -36,6 +37,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Searc
         user={user}
         bias={{ nameEn: idol.name, nameKo: idol.nameKo, birth: idolBirth }}
         initialLang={lang}
+        paid={paid}
       />
     );
   }
@@ -44,7 +46,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Searc
   const customName = cleanBiasName(one(params.bn));
   const customBirth = parseBirthString(one(params.bd));
   if (customName && customBirth) {
-    return <ReportView user={user} bias={{ nameEn: customName, nameKo: customName, birth: customBirth }} initialLang={lang} />;
+    return <ReportView user={user} bias={{ nameEn: customName, nameKo: customName, birth: customBirth }} initialLang={lang} paid={paid} />;
   }
 
   // 3) 선택 화면 (값이 있었는데 읽지 못했다면 안내 문구 표시)
@@ -53,6 +55,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Searc
     <BiasPicker
       user={user}
       initialLang={lang}
+      paid={paid}
       invalid={invalid}
       idols={IDOLS.map((i) => ({ id: i.id, name: i.name, nameKo: i.nameKo, group: i.group, gender: i.gender }))}
     />

@@ -4,9 +4,10 @@
 // 최애 선택 화면: [Quick Pick] 목록에서 원클릭 / [Custom Bias] 이름 + 생년월일 직접 입력
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { cleanBiasName, parseBirthString } from "../../lib/compatibility";
 import type { BirthInput, Lang } from "../../lib/saju";
+import { RETURN_KEY, UNLOCK_KEY } from "./unlock";
 import { reportHrefCustom, reportHrefIdol, resultBackHref, UI } from "./ui";
 
 interface IdolItem {
@@ -35,11 +36,13 @@ function split(i: IdolItem, lang: Lang): { group: string; member: string } {
 export default function BiasPicker({
   user,
   initialLang,
+  paid,
   invalid,
   idols,
 }: {
   user: BirthInput;
   initialLang: Lang;
+  paid: boolean;
   invalid: boolean;
   idols: IdolItem[];
 }) {
@@ -64,6 +67,16 @@ export default function BiasPicker({
     }
     return [...map.entries()];
   }, [idols, gender]);
+
+  // 결제창에서 돌아왔는데 최애 선택 화면이라면: 결제 직전에 보던 리포트로 되돌려 보냄
+  useEffect(() => {
+    if (!paid) return;
+    try {
+      window.localStorage.setItem(UNLOCK_KEY, "true");
+      const back = window.localStorage.getItem(RETURN_KEY);
+      if (back && back.startsWith("/report")) router.replace(`${back}${back.includes("?") ? "&" : "?"}paid=true`);
+    } catch {}
+  }, [paid, router]);
 
   function chooseLang(next: Lang) {
     setLang(next);

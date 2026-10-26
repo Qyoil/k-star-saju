@@ -8,6 +8,7 @@ import { buildReport, josa, type PersonView, type ReportSection } from "../../li
 import { ELEMENT_EMOJI, ELEMENT_NAME, fill } from "../../lib/i18n";
 import { ELEMENT_ORDER, formatBirth, type BirthInput, type Element, type Lang } from "../../lib/saju";
 import { CHECKOUT_URL, LIST_PRICE, OFF_PCT, PRICE, usd } from "../../lib/checkout";
+import { RETURN_KEY, UNLOCK_KEY } from "./unlock";
 import { reportBase, resultBackHref, UI } from "./ui";
 
 const LANG_TABS: { value: Lang; label: string }[] = [
@@ -24,27 +25,23 @@ const EL_COLOR: Record<Element, string> = {
   water: "#60a5fa",
 };
 
-/* ── 결제 설정 (Lemon Squeezy) ─────────────────────────────────────────
-   - 결제 링크: 환경변수 NEXT_PUBLIC_LEMONSQUEEZY_REPORT_URL 이 있으면 그 값, 없으면 아래 기본 링크
-   - 가격/정가: 아래 숫자만 바꾸면 버튼 문구와 할인율(%)이 자동으로 다시 계산됩니다.
-     (Lemon Squeezy 상품 가격도 같은 값으로 맞춰 두세요) */
-
-/** 결제 상태 저장(이 브라우저, 리포트별): pending = 결제창을 열었음 / paid = 열람 확인함 */
-const storeKey = (user: BirthInput, bias: { nameEn: string; birth: BirthInput }) =>
+/** 결제창을 열어 둔 상태(리포트별) 저장 */
+const pendingKey = (user: BirthInput, bias: { nameEn: string; birth: BirthInput }) =>
   `kss-unlock:v1:${formatBirth(user)}:${formatBirth(bias.birth)}:${bias.nameEn}`;
-function readStore(key: string): "pending" | "paid" | null {
-  try {
-    const v = window.localStorage.getItem(key);
-    return v === "pending" || v === "paid" ? v : null;
-  } catch {
-    return null;
-  }
-}
-function writeStore(key: string, v: "pending" | "paid") {
-  try {
-    window.localStorage.setItem(key, v);
-  } catch {}
-}
+const store = {
+  get(k: string) {
+    try {
+      return window.localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set(k: string, v: string) {
+    try {
+      window.localStorage.setItem(k, v);
+    } catch {}
+  },
+};
 
 /* 잠금 상태에서는 진짜 본문 대신 "같은 길이의 의미 없는 문장"을 그려 블러 처리합니다.
    -> 잠금 중에는 실제 풀이 문장이 화면(HTML)에 존재하지 않습니다. */
@@ -207,29 +204,49 @@ export default function ReportView({
   user,
   bias,
   initialLang,
+  paid,
 }: {
   user: BirthInput;
   bias: { nameEn: string; nameKo: string; birth: BirthInput };
   initialLang: Lang;
+  paid: boolean; // 주소에 paid=true 가 있으면 true
 }) {
   const [lang, setLang] = useState<Lang>(initialLang);
-  // 테스트용 잠금: locked -> revealing(블러 상태로 진짜 본문 그림) -> open(블러가 풀림)
+  // locked -> revealing(블러 상태로 진짜 본문 그림) -> open(0.9초에 걸쳐 블러가 풀림)
   const [phase, setPhase] = useState<"locked" | "revealing" | "open">("locked");
   const [awaiting, setAwaiting] = useState(false); // 결제창을 연 뒤 "결제했어요" 확인을 기다리는 중
-  const timer = useRef<number | null>(null);
-  const key = storeKey(user, bias);
-  useEffect(
-    () => () => {
-      if (timer.current) window.clearTimeout(timer.current);
-    },
-    [],
-  );
-  // 다시 들어왔을 때: 이미 열람 확인한 리포트면 바로 열고, 결제창만 열어 둔 상태면 확인 카드를 보여줌
+  const [celebrate, setCelebrate] = useState(false); // 해제 직후 축하 메시지
+  const timers = useRef<number[]>([]);
+  const key = pendingKey(user, bias);
+  const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms));
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  /** 잠금 해제: 블러 상태로 본문을 그린 뒤 다음 프레임에 풀어 0.9초 전환이 보이게 함 */
+  function reveal(withCelebration: boolean) {
+    setAwaiting(false);
+    setPhase("revealing");
+    later(() => setPhase("open"), 60);
+    if (withCelebration) {
+      setCelebrate(true);
+      later(() => setCelebrate(false), 5000);
+    }
+  }
+
+  // 마운트: paid=true 로 들어왔거나 저장된 해제 기록이 있으면 바로 해제, 결제창만 열어 둔 상태면 확인 카드
   useEffect(() => {
-    const saved = readStore(key);
-    if (saved === "paid") setPhase("open");
-    else if (saved === "pending") setAwaiting(true);
-  }, [key]);
+    if (paid) {
+      store.set(UNLOCK_KEY, "true");
+      const u = new URL(window.location.href); // 새로고침 때 축하가 반복되지 않도록 주소에서 paid 제거
+      u.searchParams.delete("paid");
+      window.history.replaceState(null, "", u.pathname + u.search);
+      reveal(true);
+    } else if (store.get(UNLOCK_KEY) === "true") {
+      reveal(false);
+    } else if (store.get(key) === "pending") {
+      setAwaiting(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, paid]);
   const t = UI[lang];
   const biasName = lang === "ko" ? bias.nameKo : bias.nameEn;
   const report = useMemo(() => buildReport(user, { name: biasName, birth: bias.birth }, lang), [user, bias.birth, biasName, lang]);
@@ -244,23 +261,24 @@ export default function ReportView({
     return u.toString();
   }, [user, bias.nameEn, bias.birth, lang]);
 
-  /** 결제 링크 클릭: 새 탭은 <a target="_blank"> 가 열고, 여기서는 "결제창 열었음"만 기록 */
+  /** 결제 링크 클릭: 새 탭은 <a target="_blank"> 가 열고, 여기서는 "결제창 열었음"과 복귀 주소만 기록 */
   function onCheckoutClick() {
-    writeStore(key, "pending");
-    window.setTimeout(() => setAwaiting(true), 200);
+    store.set(key, "pending");
+    const u = new URL(window.location.href);
+    u.searchParams.delete("paid");
+    store.set(RETURN_KEY, u.pathname + u.search);
+    later(() => setAwaiting(true), 200);
   }
 
   /**
    * "결제했어요 · 리포트 열기".
-   * 주의: 지금은 결제 여부를 서버에서 확인하지 않는 "자기 확인" 방식입니다.
+   * 주의: 결제 여부를 서버에서 확인하지 않는 "자기 확인" 방식입니다. paid=true 주소도 누구나 만들 수 있습니다.
    * 결제한 사람에게만 열리게 하려면 Lemon Squeezy 웹훅(order_created) 확인 후 서버에서 본문을 내려 주세요.
    */
   function unlock() {
     if (phase !== "locked") return;
-    writeStore(key, "paid");
-    setAwaiting(false);
-    setPhase("revealing");
-    timer.current = window.setTimeout(() => setPhase("open"), 60);
+    store.set(UNLOCK_KEY, "true");
+    reveal(true);
   }
   const unlocked = phase !== "locked";
 
@@ -278,6 +296,7 @@ export default function ReportView({
           --rp-bg: #0a0616; --rp-fg: #f4efff; --rp-dim: #b3a6dc; --rp-card: rgba(255,255,255,.05);
           --rp-line: rgba(196,181,253,.22); --rp-accent: #e9c46a; --rp-rule: rgba(233,196,106,.55);
         }
+        @keyframes rp-pop { 0% { opacity:0; transform:translateY(-14px) scale(.92) } 60% { opacity:1; transform:translateY(0) scale(1.04) } 100% { opacity:1; transform:scale(1) } }
         .rp-serif { font-family: "Playfair Display", Georgia, "Noto Serif KR", "Noto Serif SC", "Songti SC", serif; }
         .rp { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         @media print {
@@ -299,6 +318,15 @@ export default function ReportView({
         <div className="absolute -right-32 top-[30%] h-[28rem] w-[28rem] rounded-full bg-fuchsia-600/20 blur-[120px]" />
         <div className="absolute -bottom-32 left-1/4 h-[24rem] w-[24rem] rounded-full bg-amber-500/10 blur-[120px]" />
       </div>
+
+      {celebrate && (
+        <div
+          role="status"
+          className="rp-noprint fixed inset-x-4 top-4 z-50 mx-auto max-w-sm animate-[rp-pop_.9s_ease-out_both] rounded-2xl border border-fuchsia-300/50 bg-[rgba(18,8,44,.78)] px-5 py-3 text-center text-[15px] font-bold text-white shadow-[0_0_48px_rgba(217,70,239,.65),inset_0_1px_0_rgba(255,255,255,.2)] backdrop-blur-xl"
+        >
+          {t.celebrate}
+        </div>
+      )}
 
       <div className="relative z-10 mx-auto flex w-full max-w-[760px] flex-col gap-10">
         {/* 도구 줄 (인쇄 시 숨김) */}
