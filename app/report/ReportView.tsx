@@ -23,8 +23,34 @@ const EL_COLOR: Record<Element, string> = {
   water: "#60a5fa",
 };
 
-/** 테스트용 가격 표기. 실제 결제(Lemon Squeezy) 연결 시 이 값과 아래 unlock() 을 교체하세요. */
-const PRICE = "$3.99";
+/* ── 결제 설정 (Lemon Squeezy) ─────────────────────────────────────────
+   - 결제 링크: 환경변수 NEXT_PUBLIC_LEMONSQUEEZY_REPORT_URL 이 있으면 그 값, 없으면 아래 기본 링크
+   - 가격/정가: 아래 숫자만 바꾸면 버튼 문구와 할인율(%)이 자동으로 다시 계산됩니다.
+     (Lemon Squeezy 상품 가격도 같은 값으로 맞춰 두세요) */
+const CHECKOUT_URL =
+  process.env.NEXT_PUBLIC_LEMONSQUEEZY_REPORT_URL ||
+  "https://k-star-saju.lemonsqueezy.com/checkout/buy/9351c991-d085-4ebe-a0f8-984e30dac440";
+const PRICE = 3.99;
+const LIST_PRICE = 6.99;
+const OFF_PCT = Math.round((1 - PRICE / LIST_PRICE) * 100); // 3.99 vs 6.99 -> 43
+const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/** 결제 상태 저장(이 브라우저, 리포트별): pending = 결제창을 열었음 / paid = 열람 확인함 */
+const storeKey = (user: BirthInput, bias: { nameEn: string; birth: BirthInput }) =>
+  `kss-unlock:v1:${formatBirth(user)}:${formatBirth(bias.birth)}:${bias.nameEn}`;
+function readStore(key: string): "pending" | "paid" | null {
+  try {
+    const v = window.localStorage.getItem(key);
+    return v === "pending" || v === "paid" ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeStore(key: string, v: "pending" | "paid") {
+  try {
+    window.localStorage.setItem(key, v);
+  } catch {}
+}
 
 /* 잠금 상태에서는 진짜 본문 대신 "같은 길이의 의미 없는 문장"을 그려 블러 처리합니다.
    -> 잠금 중에는 실제 풀이 문장이 화면(HTML)에 존재하지 않습니다. */
@@ -195,21 +221,54 @@ export default function ReportView({
   const [lang, setLang] = useState<Lang>(initialLang);
   // 테스트용 잠금: locked -> revealing(블러 상태로 진짜 본문 그림) -> open(블러가 풀림)
   const [phase, setPhase] = useState<"locked" | "revealing" | "open">("locked");
+  const [awaiting, setAwaiting] = useState(false); // 결제창을 연 뒤 "결제했어요" 확인을 기다리는 중
   const timer = useRef<number | null>(null);
-  useEffect(() => () => {
-    if (timer.current) window.clearTimeout(timer.current);
-  }, []);
+  const key = storeKey(user, bias);
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+  // 다시 들어왔을 때: 이미 열람 확인한 리포트면 바로 열고, 결제창만 열어 둔 상태면 확인 카드를 보여줌
+  useEffect(() => {
+    const saved = readStore(key);
+    if (saved === "paid") setPhase("open");
+    else if (saved === "pending") setAwaiting(true);
+  }, [key]);
   const t = UI[lang];
   const biasName = lang === "ko" ? bias.nameKo : bias.nameEn;
   const report = useMemo(() => buildReport(user, { name: biasName, birth: bias.birth }, lang), [user, bias.birth, biasName, lang]);
 
+  /** 결제 링크(새 탭) + 결제 웹훅에서 쓸 수 있게 생년월일/최애/언어를 custom data 로 전달 */
+  const checkoutHref = useMemo(() => {
+    try {
+      const u = new URL(CHECKOUT_URL);
+      u.searchParams.set("checkout[custom][birth]", formatBirth(user));
+      u.searchParams.set("checkout[custom][bias]", bias.nameEn);
+      u.searchParams.set("checkout[custom][bias_birth]", formatBirth(bias.birth));
+      u.searchParams.set("checkout[custom][lang]", lang);
+      return u.toString();
+    } catch {
+      return CHECKOUT_URL;
+    }
+  }, [user, bias.nameEn, bias.birth, lang]);
+
+  /** 결제 링크 클릭: 새 탭은 <a target="_blank"> 가 열고, 여기서는 "결제창 열었음"만 기록 */
+  function onCheckoutClick() {
+    writeStore(key, "pending");
+    window.setTimeout(() => setAwaiting(true), 200);
+  }
+
   /**
-   * TODO(결제 연동): 지금은 테스트용으로 클릭하면 바로 열립니다.
-   * 실제 결제 후에는 이 함수 대신 Lemon Squeezy 체크아웃으로 보내고,
-   * 결제 확인(웹훅)이 끝난 사람에게만 서버에서 본문을 내려 주세요.
+   * "결제했어요 · 리포트 열기".
+   * 주의: 지금은 결제 여부를 서버에서 확인하지 않는 "자기 확인" 방식입니다.
+   * 결제한 사람에게만 열리게 하려면 Lemon Squeezy 웹훅(order_created) 확인 후 서버에서 본문을 내려 주세요.
    */
   function unlock() {
     if (phase !== "locked") return;
+    writeStore(key, "paid");
+    setAwaiting(false);
     setPhase("revealing");
     timer.current = window.setTimeout(() => setPhase("open"), 60);
   }
@@ -370,15 +429,46 @@ export default function ReportView({
                   <span className="text-3xl" aria-hidden="true">
                     🔒
                   </span>
-                  <p className="rp-serif m-0 text-lg font-semibold leading-snug text-white">{t.lockedTitle}</p>
-                  <button
-                    type="button"
-                    onClick={unlock}
-                    className="min-h-14 w-full cursor-pointer rounded-2xl border border-white/25 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-4 py-3 text-[15px] font-bold leading-snug text-white shadow-[0_0_30px_rgba(217,70,239,.55)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(236,72,153,.8)] active:translate-y-0 active:scale-[.97]"
-                  >
-                    {josa(fill(t.unlockCta, { idol: report.bias.name, price: PRICE }))}
-                  </button>
-                  <p className="m-0 text-[11px] text-violet-200/60">{t.testNote}</p>
+                  {awaiting ? (
+                    <>
+                      <p className="rp-serif m-0 text-lg font-semibold leading-snug text-white">{t.awaitTitle}</p>
+                      <p className="m-0 text-[13px] leading-relaxed text-violet-100/80">{t.awaitBody}</p>
+                      <button
+                        type="button"
+                        onClick={unlock}
+                        className="min-h-14 w-full cursor-pointer rounded-2xl border border-white/25 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-4 py-3 text-[15px] font-bold leading-snug text-white shadow-[0_0_30px_rgba(217,70,239,.55)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(236,72,153,.8)] active:translate-y-0 active:scale-[.97]"
+                      >
+                        {t.awaitDone}
+                      </button>
+                      <a
+                        href={checkoutHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-violet-200/80 underline underline-offset-4 hover:text-white"
+                      >
+                        {t.awaitReopen}
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="rp-serif m-0 text-lg font-semibold leading-snug text-white">
+                        {josa(fill(t.lockedTitle, { idol: report.bias.name }))}
+                      </p>
+                      <a
+                        href={checkoutHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={onCheckoutClick}
+                        className="flex min-h-14 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500 px-4 py-3 text-[15px] font-bold leading-snug text-white no-underline shadow-[0_0_30px_rgba(217,70,239,.55)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_48px_rgba(236,72,153,.8)] active:translate-y-0 active:scale-[.97]"
+                      >
+                        {fill(t.unlockMain, { price: usd(PRICE) })}
+                        <span className="mt-0.5 text-[11px] font-medium text-white/85">
+                          {fill(t.unlockSub, { off: OFF_PCT })} (<s>{usd(LIST_PRICE)}</s>)
+                        </span>
+                      </a>
+                      <p className="m-0 text-[11px] text-violet-200/60">{t.secureNote}</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

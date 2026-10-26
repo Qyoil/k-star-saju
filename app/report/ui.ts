@@ -37,9 +37,14 @@ export interface UiText {
   luckyNum: string;
   footer: string;
   lockedTag: string;
-  lockedTitle: string;
-  unlockCta: string; // {idol} {price}
-  testNote: string;
+  lockedTitle: string; // {idol}
+  unlockMain: string; //  {price}
+  unlockSub: string; //   {off}
+  secureNote: string;
+  awaitTitle: string;
+  awaitBody: string;
+  awaitDone: string;
+  awaitReopen: string;
   unlockedTag: string;
 }
 
@@ -78,9 +83,14 @@ export const UI: Record<Lang, UiText> = {
     luckyNum: "Numbers",
     footer: "K-Star Saju · for entertainment only",
     lockedTag: "Locked",
-    lockedTitle: "3 chapters are waiting for you",
-    unlockCta: "Unlock Full Secrets with {idol} for {price}",
-    testNote: "Test mode · no payment is taken yet",
+    lockedTitle: "3 chapters about you and {idol} are waiting",
+    unlockMain: "Unlock Full Secrets · {price}",
+    unlockSub: "Special Launch {off}% OFF",
+    secureNote: "Secure checkout by Lemon Squeezy · opens in a new tab",
+    awaitTitle: "Your checkout window is open",
+    awaitBody: "Finished paying? Tap below to open your full report.",
+    awaitDone: "I've paid · Open my report",
+    awaitReopen: "Reopen checkout",
     unlockedTag: "Unlocked",
   },
   ko: {
@@ -117,9 +127,14 @@ export const UI: Record<Lang, UiText> = {
     luckyNum: "숫자",
     footer: "K-Star Saju · 재미로만 즐겨 주세요",
     lockedTag: "잠김",
-    lockedTitle: "3개의 챕터가 기다리고 있어요",
-    unlockCta: "{idol}와(과)의 비밀 전체 열기 · {price}",
-    testNote: "테스트 모드 · 아직 결제는 진행되지 않아요",
+    lockedTitle: "{idol}와(과) 나의 3개 챕터가 기다리고 있어요",
+    unlockMain: "전체 비밀 열기 · {price}",
+    unlockSub: "런칭 특가 {off}% 할인",
+    secureNote: "Lemon Squeezy 보안 결제 · 새 탭에서 열려요",
+    awaitTitle: "결제창을 열어 두었어요",
+    awaitBody: "결제를 마치셨나요? 아래 버튼을 눌러 전체 리포트를 여세요.",
+    awaitDone: "결제했어요 · 리포트 열기",
+    awaitReopen: "결제창 다시 열기",
     unlockedTag: "열림",
   },
   zh: {
@@ -156,9 +171,14 @@ export const UI: Record<Lang, UiText> = {
     luckyNum: "数字",
     footer: "K-Star Saju · 仅供娱乐",
     lockedTag: "已锁定",
-    lockedTitle: "还有3个章节等你解锁",
-    unlockCta: "解锁与{idol}的全部秘密 · {price}",
-    testNote: "测试模式 · 目前不会扣款",
+    lockedTitle: "你与{idol}的3个章节正等你解锁",
+    unlockMain: "解锁全部秘密 · {price}",
+    unlockSub: "限时首发 {off}% 折扣",
+    secureNote: "Lemon Squeezy 安全支付 · 在新标签页打开",
+    awaitTitle: "支付窗口已打开",
+    awaitBody: "已完成支付？点击下方按钮打开完整报告。",
+    awaitDone: "我已支付 · 打开报告",
+    awaitReopen: "重新打开支付页",
     unlockedTag: "已解锁",
   },
 };
